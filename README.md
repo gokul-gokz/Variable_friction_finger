@@ -3,7 +3,7 @@
 1. Download the repository into an workspace.
 2. catkin_make the workspace. This will create dev and build files for the common_msgs_gl and rosserial files.
 3. Then run the command 
-> rosserial_client make_libraries path_to_library 
+> rosrun rosserial_client make_libraries path_to_library 
 4. This will create a ros_lib foder on the given path.
 5. Now open the arduino installation folder. Remove the existing ros_lib folder which will be inside the libraries folder.
 6. Then move the newly created ros_lib folder to this location.
