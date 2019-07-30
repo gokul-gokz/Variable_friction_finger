@@ -27,6 +27,7 @@
 > rosrun friction_finger_gripper controller_node
 
 If the controller is launched properly, you should see the message "Constructor with parameters initiated" printed twice on screen as there are two fingers.
+
 3. Launch the high level controller node
 > rosrun friction_finger_gripper high_level_controller_node 
 4. Launch the Arduino
