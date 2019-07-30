@@ -33,7 +33,8 @@ finger_controller::finger_controller(int num_fingers, float parameters[])
 int main(int argc, char **argv)
 {
  ros::init(argc, argv, "finger_controller");
- float parameters[]={21,2,3,4,20,6,7,8};
+// {Motor_left_Id,Left_finger_length,left_finger_width,Left_finger_friction_coefficient,Motor_right_Id,Right_finger_length,Right_finger_width,Right_finger_friction_coefficient}
+ float parameters[]={21,2,3,4,20,6,7,8};   //Need to fix( Load params from yaml)
  finger_controller h1(2,parameters);
  return 0;
 }
