@@ -177,7 +177,7 @@ if __name__ == '__main__':
     rospy.init_node('Control_loop')
     list_of_lists=[]
     #with open('p.txt') as f:
-    with open('/home/gsathyanarayanan/Friction_finger_gripper/data.txt') as f:    
+    with open('/home/gsathyanarayanan/finger_ws/src/Motion_planner/data1.txt') as f:    
         for line in f:
     	   inner_list = [elt.strip() for elt in line.split(',')]
     	   list_of_lists.append(inner_list)
