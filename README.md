@@ -24,12 +24,14 @@
 1. Run the following commands in different terminals:
 > roscore
 2. Launch the low level controller node.
-> rosrun friction_finger_gripper controller_node 
+> rosrun friction_finger_gripper controller_node
+
 If the controller is launched properly, you should see the message "Constructor with parameters initiated" printed twice on screen as there are two fingers.
 3. Launch the high level controller node
 > rosrun friction_finger_gripper high_level_controller_node 
 4. Launch the Arduino
 > rosrun rosserial_python serial_node.py
+
 If the serial node is launched properly, you should see the msgs Setup service server on Friction_surface_Right [common_msgs_gl/SendBool] ,Setup service server on Friction_surface_Left [common_msgs_gl/SendBool] on the screen.
 
 
