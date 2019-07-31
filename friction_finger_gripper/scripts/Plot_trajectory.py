@@ -14,7 +14,8 @@ import time
 bridge = CvBridge()
 X = []
 Y = []
-
+start=[.02352779128606956, 0.05708715299609142]
+end=[.02362027351429178, .10725941767094406]
 
 class trajectory:
     def __init__(self):
@@ -27,16 +28,16 @@ class trajectory:
 
     def listener(self):
         rospy.Subscriber("/object_position", Point, self.callback_position)
-        rospy.Subscriber("/aruco_simple/result", Image, self.callback)
+        rospy.Subscriber("/usb_cam/image_raw", Image, self.callback)
         rospy.Subscriber("/Action", Int32, self.callback_action)
         
 
     def callback(self, data):
         self.cv_image = bridge.imgmsg_to_cv2(data, "bgr8")
         (rows, cols, channels) = self.cv_image.shape
-        if cols > 60 and rows > 60:
-            cv2.circle(self.cv_image, (50, 50), 10, 255)
-            length = len(self.X)
+        # if cols > 60 and rows > 60:
+        #     cv2.circle(self.cv_image, (50, 50), 10, 255)
+        #     length = len(self.X)
         # cv2.line(cv_image, (0, 0), (50, 50), (255, 255, 0), 2)
         length = len(self.X)
         # pts = self.coords.reshape((-1, 1, 2))
@@ -51,47 +52,57 @@ class trajectory:
         # cv2.polylines(cv_image, [pts], True, (0, 255, 255))
         # cv2.line(self.cv_image, (10, 10), (20, 20), (255, 255, 0), 2)
         # cv2.line(self.cv_image, (10, 10), (10, 20), (255, 255, 0), 2)
-        #cv2.circle(self.cv_image, (self.X[i], self.Y[i]), 4, (0, 0, 255), -1)
+        cv2.circle(self.cv_image, self.XY_to_pixel_conversion(start[0],start[1]), 6,(255, 0, 255),-1)
+        cv2.circle(self.cv_image, self.XY_to_pixel_conversion(end[0],end[1]), 6, (100, 60, 255),-1)
 
         font = cv2.FONT_HERSHEY_SIMPLEX
-        cv2.putText(self.cv_image, self.action, (10, 250), font, 1, (0, 0, 255), 2)
+        cv2.putText(self.cv_image, self.action, (190,30), font, 1, (0, 0, 10), 2)
         cv2.imshow("Image window", self.cv_image)
         cv2.waitKey(3)
+
+    def XY_to_pixel_conversion(self,x,y):
+        x = int(x * 1893.283 + 265.703)
+        y = int(-y * 2016.301  +  317.598)
+        return x,y
 
     def callback_position(self, msg):
         # print 123
         global X, Y
-        self.x = int(msg.x * 1893.283 + 265.703)
-        self.y = int(-msg.y * 2016.301  +  317.598)
+        # self.x = int(msg.x * 1893.283 + 265.703)
+        # self.y = int(-msg.y * 2016.301  +  317.598)
+        self.x,self.y=self.XY_to_pixel_conversion(msg.x,msg.y)
         self.X.append(self.x)
         self.Y.append(self.y)
 
-        print "Length of array=", len(self.X)
+        #print "Length of array=", len(self.X)
         X = self.X
         Y = self.Y
         # self.coords.append([self.x, self.y])
         # print self.x, self.y
     
     def callback_action(self, act):
-        if (act == 0):
+        print type(act)
+
+        if (act.data == 0):
             self.action = 'Left Slide down'
-        if (act == 1):
+        if (act.data == 1):
             self.action = 'Right Slide down'
-        if (act == 3):
+        if (act.data == 2):
             self.action = 'Left Slide up'
-        if (act == 4):
+        if (act.data == 3):
             self.action = 'Right Slide up'
-        if (act == 5):
+        if (act.data == 4):
             self.action = 'Anti-clockwise Rotation'
-        if (act == 6):
+        if (act.data == 5):
             self.action = 'Clockwise Rotation'
-    
+        print self.action
     def traj_publisher(self):
         pub = rospy.Publisher("/object_trajectory", Image,queue_size = 50)
         rate = rospy.Rate(30) # 10hz
+        self.listener()
+        rospy.wait_for_message("object_position", Point)
+	rospy.wait_for_message("aruco_simple/result", Image)
         while not rospy.is_shutdown():
-            self.listener()
-            time.sleep(0.1)
             pub.publish(bridge.cv2_to_imgmsg(self.cv_image, "bgr8"))
             rate.sleep()
 

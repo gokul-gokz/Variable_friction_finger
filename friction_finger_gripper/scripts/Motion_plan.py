@@ -34,7 +34,7 @@ def angle_conversion(angle, flag):
     if(flag == 1):
         n_angle =  0.002244*angle+ 0.563388
     else:
-        n_angle = -0.002223*angle + 1.043235
+        n_angle = -0.002223*angle + 0.94707
     print("n_angle = ", n_angle)
     return (n_angle)
 
@@ -63,7 +63,7 @@ def encoder_gripper_angle_conversion(enc,flag):
     if(flag==1):
         theta=(enc-0.563388)/0.002244
     else:
-        theta=-(enc-1.043235)/0.002223
+        theta=-(enc-0.94707)/0.002223
     return theta
 
 
@@ -177,7 +177,7 @@ if __name__ == '__main__':
     rospy.init_node('Control_loop')
     list_of_lists=[]
     #with open('p.txt') as f:
-    with open('/home/gsathyanarayanan/finger_ws/src/Motion_planner/data1.txt') as f:    
+    with open('/home/gsathyanarayanan/Friction_finger_gripper/Testing_code/data1.txt') as f:    
         for line in f:
     	   inner_list = [elt.strip() for elt in line.split(',')]
     	   list_of_lists.append(inner_list)
@@ -234,7 +234,7 @@ if __name__ == '__main__':
                 Call_visual_servo(goal_x,goal_y)
 
             theta=read_pos()
-            Motor_value=theta[1]-0.02
+            Motor_value=theta[1]-0.1
             pub.publish(int(smooth_actions[i][0]))
             rotate_object_anticlockwise(Motor_value)
             while(1):
@@ -274,7 +274,7 @@ if __name__ == '__main__':
                 goal_x,goal_y=smooth_actions[i-1][3],smooth_actions[i-1][4]
                 Call_visual_servo(goal_x,goal_y)
             theta=read_pos()
-            Motor_value=theta[0]-0.02
+            Motor_value=theta[0]-0.1
                 #print "Motor_value",Motor_value
             pub.publish(int(smooth_actions[i][0]))
             rotate_object_clockwise(Motor_value)
