@@ -59,8 +59,8 @@ class trajectory:
     def callback_position(self, msg):
         # print 123
         global X, Y
-        self.x = int(msg.x * 100 * 37 + 205)
-        self.y = int(-msg.y * 100 * 37 + 345)
+        self.x = int(msg.x * 1942.347 + 298.124)
+        self.y = int(-msg.y * 1984. 738  + 243.968)
         self.X.append(self.x)
         self.Y.append(self.y)
 
