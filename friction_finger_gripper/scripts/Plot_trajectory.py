@@ -8,6 +8,7 @@ from geometry_msgs.msg import Point
 from cv_bridge import CvBridge, CvBridgeError
 import numpy as np
 import matplotlib.pyplot as plt
+import time
 
 
 bridge = CvBridge()
@@ -28,6 +29,7 @@ class trajectory:
         rospy.Subscriber("/object_position", Point, self.callback_position)
         rospy.Subscriber("/aruco_simple/result", Image, self.callback)
         rospy.Subscriber("/Action", Int32, self.callback_action)
+        
 
     def callback(self, data):
         self.cv_image = bridge.imgmsg_to_cv2(data, "bgr8")
@@ -59,8 +61,8 @@ class trajectory:
     def callback_position(self, msg):
         # print 123
         global X, Y
-        self.x = int(msg.x * 1942.347 + 298.124)
-        self.y = int(-msg.y * 1984. 738  + 243.968)
+        self.x = int(msg.x * 1893.283 + 265.703)
+        self.y = int(-msg.y * 2016.301  +  317.598)
         self.X.append(self.x)
         self.Y.append(self.y)
 
@@ -69,7 +71,7 @@ class trajectory:
         Y = self.Y
         # self.coords.append([self.x, self.y])
         # print self.x, self.y
-
+    
     def callback_action(self, act):
         if (act == 0):
             self.action = 'Left Slide down'
@@ -83,6 +85,15 @@ class trajectory:
             self.action = 'Anti-clockwise Rotation'
         if (act == 6):
             self.action = 'Clockwise Rotation'
+    
+    def traj_publisher(self):
+        pub = rospy.Publisher("/object_trajectory", Image,queue_size = 50)
+        rate = rospy.Rate(30) # 10hz
+        while not rospy.is_shutdown():
+            self.listener()
+            time.sleep(0.1)
+            pub.publish(bridge.cv2_to_imgmsg(self.cv_image, "bgr8"))
+            rate.sleep()
 
 
 '''
@@ -117,10 +128,8 @@ def main():
     global X, Y
     rospy.init_node('Image', anonymous=True)
     t = trajectory()
-    t.listener()
-    print X, Y
-    plt.plot(X, Y)
-    rospy.spin()
+    t.traj_publisher()
+    #rospy.spin()
     # plt.show()
 
 
