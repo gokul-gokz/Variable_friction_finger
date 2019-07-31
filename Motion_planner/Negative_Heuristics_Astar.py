@@ -16,7 +16,7 @@ from numpy import exp
 import timeit
 
 FINGER_END = 13
-FINGER_START = 6.5
+FINGER_START = 6.8
 SLIDING_RESOLUTION = 0.1
 ROTATION_SLIDE_RESOLUTION=0.2
 PALM_WIDTH = 5
@@ -868,7 +868,7 @@ if __name__=="__main__":
     start_r = 7
     start = node(0, start_l, start_r, 0, None, None)
 
-    goal = node(0, 12.5, 12.5, -90, None, None)
+    goal = node(0, 12, 12, -180, None, None)
 
     high_level_plan(start, goal)
 
