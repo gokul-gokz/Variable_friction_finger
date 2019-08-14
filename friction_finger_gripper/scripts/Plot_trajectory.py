@@ -14,8 +14,9 @@ import time
 bridge = CvBridge()
 X = []
 Y = []
-start=[.02352779128606956, 0.05708715299609142]
-end=[.02362027351429178, .10725941767094406]
+start=[0.0235,0.0570]
+end=[0.0236, 0.1073]
+
 
 class trajectory:
     def __init__(self):
@@ -56,7 +57,7 @@ class trajectory:
         cv2.circle(self.cv_image, self.XY_to_pixel_conversion(end[0],end[1]), 6, (100, 60, 255),-1)
 
         font = cv2.FONT_HERSHEY_SIMPLEX
-        cv2.putText(self.cv_image, self.action, (190,30), font, 1, (0, 0, 10), 2)
+        cv2.putText(self.cv_image, self.action, (50,30), font, 1, (0, 0, 10), 2)
         cv2.imshow("Image window", self.cv_image)
         cv2.waitKey(3)
 
@@ -95,7 +96,16 @@ class trajectory:
             self.action = 'Anti-clockwise Rotation'
         if (act.data == 5):
             self.action = 'Clockwise Rotation'
+        if (act.data == 6):
+            self.action = 'Visual Servoing - Left Slide down'
+        if (act.data == 7):
+            self.action = 'Visual Servoing - Right Slide down'
+        if (act.data == 8):
+            self.action = 'Visual Servoing - Left Slide up'
+        if (act.data == 9):
+            self.action = 'Visual Servoing - Right Slide up'
         print self.action
+
     def traj_publisher(self):
         pub = rospy.Publisher("/object_trajectory", Image,queue_size = 50)
         rate = rospy.Rate(30) # 10hz

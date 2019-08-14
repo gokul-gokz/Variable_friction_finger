@@ -11,6 +11,7 @@ from geometry_msgs.msg import Point
 from common_msgs_gl.srv import *
 from std_msgs.msg       import Float32
 from std_msgs.msg       import Int32
+from common_msgs_gl.msg import Motor_position
 
 
 FINGER_END = 15
@@ -24,7 +25,7 @@ TH2_MIN= 0.65 #37.5
 FINGER_WIDTH=1
 Block_orientation=0
 Block_Position=[0,0]
-VISUAL_SERVOING_ENABLE=0
+VISUAL_SERVOING_ENABLE=1
 
 
 def angle_conversion(angle, flag):
@@ -34,9 +35,22 @@ def angle_conversion(angle, flag):
     if(flag == 1):
         n_angle =  0.002244*angle+ 0.563388
     else:
-        n_angle = -0.002223*angle + 0.94707
+        n_angle = -0.002223*angle + 0.96832
     print("n_angle = ", n_angle)
     return (n_angle)
+
+
+def encoder_gripper_angle_conversion(enc,flag):
+    # if(flag==1):
+    #     theta=-(enc-1.03396)/0.0029
+    # else:
+    #     theta=(enc-0.14021)/0.00389
+    # return theta
+    if(flag==1):
+        theta=(enc-0.563388)/0.002244
+    else:
+        theta=-(enc-0.96832)/0.002223
+    return theta
 
 def finger_to_cartesian(L,R,A,th):
     if A=="r_plus" or A=="r_minus":
@@ -51,20 +65,6 @@ def finger_to_cartesian(L,R,A,th):
 
 
     return x_square,y_square
-
-
-
-def encoder_gripper_angle_conversion(enc,flag):
-    # if(flag==1):
-    #     theta=-(enc-1.03396)/0.0029
-    # else:
-    #     theta=(enc-0.14021)/0.00389
-    # return theta
-    if(flag==1):
-        theta=(enc-0.563388)/0.002244
-    else:
-        theta=-(enc-0.94707)/0.002223
-    return theta
 
 
 def slide_left_finger_down(p):
@@ -137,7 +137,7 @@ def Correction_step(goal_x,goal_y):
     rospy.wait_for_service('Visual_servoing')
     try:
         vis_servo_client=rospy.ServiceProxy('Visual_servoing',Visual_servo_goal)
-        resp=vis_servo_client(goal_x,goal_y)
+        resp=vis_servo_client(goal_x,goal_y,0)
         return resp
     except rospy.ServiceException, e:
         print ("Service call failed: %s" % e)
@@ -172,12 +172,35 @@ def Call_visual_servo(goal_x,goal_y):
         else:
             print "Action position correction failed"
 
+class Finger:
+    def __init__(self):
+        self.pub_enable=1
+        rospy.Subscriber("/object_position", Point, self.callback)
+        self.Motor_value_pub=rospy.Publisher('Finger_motor_position',Motor_position,queue_size=10000)
+        print 'object created'
+    def callback(self, msg):
 
-if __name__ == '__main__':
-    rospy.init_node('Control_loop')
+        self.x = msg.x * 100.
+        self.y = msg.y * 100.
+        if(self.pub_enable):
+            values=Motor_position()
+            val=read_pos()
+            values.Left=val[0]
+            values.Right=val[1]
+            self.Motor_value_pub.publish(values)
+
+    def stop_publishing_Motor(self):
+        self.pub_enable=0
+    
+    def start_publishing_Motor(self):
+        self.pub_enable=1
+        
+
+def Motion_planner():
+    F1=Finger()
     list_of_lists=[]
     #with open('p.txt') as f:
-    with open('/home/gsathyanarayanan/Friction_finger_gripper/Testing_code/data1.txt') as f:    
+    with open('/home/gsathyanarayanan/finger_ws/Test_Data/Pure_Motion_Planner/Test2/data1.txt') as f:    
         for line in f:
     	   inner_list = [elt.strip() for elt in line.split(',')]
     	   list_of_lists.append(inner_list)
@@ -229,9 +252,11 @@ if __name__ == '__main__':
             slide_right_finger_up(angle_conversion(smooth_actions[i][1],0))
         elif smooth_actions[i][0]==4:
             if(VISUAL_SERVOING_ENABLE):
+                F1.stop_publishing_Motor()
                 pub.publish(6)
                 goal_x,goal_y=smooth_actions[i-1][3],smooth_actions[i-1][4]
                 Call_visual_servo(goal_x,goal_y)
+                F1.start_publishing_Motor()
 
             theta=read_pos()
             Motor_value=theta[1]-0.1
@@ -270,9 +295,11 @@ if __name__ == '__main__':
 
         elif smooth_actions[i][0]==5:
             if(VISUAL_SERVOING_ENABLE):
+                F1.stop_publishing_Motor()
                 pub.publish(int(6))
                 goal_x,goal_y=smooth_actions[i-1][3],smooth_actions[i-1][4]
                 Call_visual_servo(goal_x,goal_y)
+                F1.start_publishing_Motor()
             theta=read_pos()
             Motor_value=theta[0]-0.1
                 #print "Motor_value",Motor_value
@@ -325,8 +352,9 @@ if __name__ == '__main__':
     if(VISUAL_SERVOING_ENABLE):
         pub.publish(int(6))
         goal_x,goal_y=smooth_actions[len(smooth_actions)-1][3],smooth_actions[len(smooth_actions)-1][4]
+        F1.stop_publishing_Motor()
         Call_visual_servo(goal_x,goal_y)
-    
+        F1.start_publishing_Motor()
     print "Motion_Plan_execution_done"
 
     
@@ -363,5 +391,8 @@ if __name__ == '__main__':
     #     print "Correction step failed"
 
 
+if __name__ == '__main__':
+    rospy.init_node('Control_loop')
+    Motion_planner()
     rospy.spin()
 

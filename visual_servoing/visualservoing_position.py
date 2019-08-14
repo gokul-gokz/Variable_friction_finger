@@ -10,7 +10,7 @@ from friction_finger_gripper.srv import*
 
 from geometry_msgs.msg import Point
 from common_msgs_gl.srv import *
-
+from std_msgs.msg import Int32
 TOLERANCE=0.5
 MAX_ITERATIONS=20
 JACOBIAN_STEPS=3

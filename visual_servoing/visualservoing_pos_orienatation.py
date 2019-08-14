@@ -4,6 +4,7 @@ import numpy as np
 from mpmath import *
 from sympy import *
 import rospy
+from std_msgs.msg import Int32
 import time
 from friction_finger_gripper.srv import*
 # from visualservoing.srv import *
@@ -11,10 +12,11 @@ from friction_finger_gripper.srv import*
 from geometry_msgs.msg import Point
 from common_msgs_gl.srv import *
 from std_msgs.msg       import Float32
+from common_msgs_gl.msg import Motor_position
 
 TOLERANCE=0.5
 MAX_ITERATIONS=20
-JACOBIAN_STEPS=3
+JACOBIAN_STEPS=1
 Block_orientation=0
 # def angle_conversion(angle, flag):
 #     angle = 180. * angle / np.pi
@@ -26,6 +28,7 @@ Block_orientation=0
 #         n_angle = -0.00292*angle + 0.509542
 #     print("n_angle = ", n_angle)
 #     return (n_angle)
+
 def angle_conversion(angle, flag):
     angle = 180. * angle / np.pi
     # 0-> Left, 1-> Right
@@ -33,10 +36,9 @@ def angle_conversion(angle, flag):
     if(flag == 1):
         n_angle =  0.002244*angle+ 0.563388
     else:
-        n_angle = -0.002223*angle + 1.043235
+        n_angle = -0.002223*angle + 0.96832
     print("n_angle = ", n_angle)
     return (n_angle)
-
 
 
 def encoder_gripper_angle_conversion(enc,flag):
@@ -48,7 +50,7 @@ def encoder_gripper_angle_conversion(enc,flag):
     if(flag==1):
         theta=(enc-0.563388)/0.002244
     else:
-        theta=-(enc-1.043235)/0.002223
+        theta=-(enc-0.96832)/0.002223
     return theta
 
 
@@ -111,7 +113,7 @@ def read_pos():
     try:
         read_position_handler = rospy.ServiceProxy('read_pos', GetDoubleArray)
         values = read_position_handler()
-        print values.data
+        #print values.data
         return values.data
     except rospy.ServiceException, e:
         print ("Service call failed: %s" % e)
@@ -148,7 +150,11 @@ class Finger:
         self.t2 = None
         self.d1 = None
         self.d2 = None
-        self.config = None
+        self.action = None
+        self.pub = rospy.Publisher('Action', Int32, queue_size=10000)
+        self.Motor_value_pub=rospy.Publisher('Finger_motor_position',Motor_position,queue_size=10000)
+
+        rate = rospy.Rate(30)
 
     def goal_update(self,goal_x,goal_y,goal_theta):
         self.X_d = np.array([goal_x, goal_y])
@@ -158,6 +164,11 @@ class Finger:
 
         self.x = msg.x * 100.
         self.y = msg.y * 100.
+        values=Motor_position()
+        val=read_pos()
+        values.Left=val[0]
+        values.Right=val[1]
+        self.Motor_value_pub.publish(values)
 
     def listener(self):
         #rospy.init_node('Vs')
@@ -242,22 +253,68 @@ class Finger:
         print 'y = ', self.y
 
     def clockwise(self):
+        theta= read_pos()
+        Motor_value = theta[0]
+        while Motor_value > 0.65:
+            slide_right_finger_up(Motor_value)
+            theta= read_pos()
+            Motor_value = theta[0] - 0.05
+
+
         print "inside clockwise"
+        self.action = 4
+        self.pub.publish(self.action)
         global Block_orientation
         Not_done=1
+        theta=read_pos()
+        Motor_value=theta[1]-0.1
+
+        rotate_object_anticlockwise(Motor_value)
+        while(1):
+                global Block_orientation
+                theta=read_pos()
+                
+               
+                Motor_value=theta[1]-0.02
+                #print "Motor_value",Motor_value
+                rotate_object_anticlockwise(Motor_value)
+                finger_angle=encoder_gripper_angle_conversion(theta[1],1)
+                print "Block_orientation=",Block_orientation
+                print "Finger_angle=",finger_angle
+                print "Diff",(abs(Block_orientation-finger_angle))%90
+                condition1=(abs(Block_orientation-finger_angle))%90<7
+                condition2=((abs(Block_orientation-finger_angle)))%90>83
+                condition3=(abs(Block_orientation+finger_angle))%90<7
+                condition4= (abs(Block_orientation+finger_angle))%90>83
+                condition5=Block_orientation<=180
+                condition6=Block_orientation>=180
+                Right_Limit_condition=Motor_value>=0.65
+                print "c1=",condition1
+                print "c2=",condition2
+                print "c3=",condition3
+                print "c4=",condition4
+                print "c5=",condition5
+                print "c6=",condition6
+                if ((condition1 or condition2) and condition6 and Right_Limit_condition):
+                    break
+                if ((condition3 or condition4) and condition5 and Right_Limit_condition):
+                    break
+        '''
         while(Not_done):
             self.ik_rightFinger()
             solution= np.pi - np.arccos(float(((self.d2-2*self.w0)**2 + self.w0**2 - self.wp**2 - (self.d1)**2)/(2*self.wp*(self.d1))))
             print solution
-            if im(solution)==0 and solution > 0.70:
+            #if im(solution)==0 and solution > 0.70:
+            if(1):
                 Not_done=0
                 theta = read_pos()
                 Motor_value = theta[1]-0.02
-                rotate_object_anticlockwise(Motor-value)
+                rotate_object_anticlockwise(Motor_value)
+                finger_angle = encoder_gripper_angle_conversion(theta[1],1)
                 print "Block_orientation=",Block_orientation
                 print "Finger_angle=",finger_angle
                 print "Diff",(abs(Block_orientation-finger_angle))%90
-                finger_angle = encoder_gripper_angle_conversion(theta[1],1)
+                
                 condition1=(abs(Block_orientation-finger_angle))%90<7
                 condition2=((abs(Block_orientation-finger_angle)))%90>83
                 condition3=(abs(Block_orientation+finger_angle))%90<7
@@ -275,65 +332,79 @@ class Finger:
                     break
                 if ((condition3 or condition4) and condition5 and Right_Limit_condition):
                     break
-                    
-                
-            else:
-                self.t1 = self.t1 - 0.02
-                slide_left_finger_down(angle_conversion(self.t1,0))
+        '''        
+            
+           
 
     def anticlockwise(self):
+        
+        theta= read_pos()
+        Motor_value = theta[1]
+        while Motor_value > 0.60:
+            slide_left_finger_up(Motor_value)
+            theta= read_pos()
+            Motor_value = theta[1] - 0.05
+            
+
+
         print "inside anticlockwise"
+        self.action = 5
+        self.pub.publish(self.action)
         global Block_orientation
         Not_done=1
-        while(Not_done):
-            self.ik_rightFinger()
-            print "d1=",self.d1
-            print "d2=",self.d2
-            solution=np.arccos(float(((self.d1 - 2*self.w0)**2 + self.w0**2 - (self.d2)**2 - self.wp**2)/(2*self.wp*(self.d2))))
-            print solution
-            if (self.t2<0.8):
-                Not_done=0
-                theta= read_pos()
-                Motor_value = theta[0] - 0.02
-                rotate_object_clockwise(Motor_value)
-                while(1):
-                    global Block_orientation
-                    theta= read_pos()
-                    Motor_value = theta[0] - 0.02
-                    rotate_object_clockwise(Motor_value)
-                    finger_angle = encoder_gripper_angle_conversion(theta[1],1)
-                    print "Block_orientation=",Block_orientation
-                    print "Finger_angle=",finger_angle
-                    print "Diff",(abs(Block_orientation-finger_angle))%90
-                    condition1=(abs(Block_orientation-finger_angle))%90<7
-                    condition2=((abs(Block_orientation-finger_angle)))%90>83
-                    condition3=(abs(Block_orientation+finger_angle))%90<7
-                    condition4= (abs(Block_orientation+finger_angle))%90>83
-                    condition5=Block_orientation<=180
-                    condition6=Block_orientation>=180
-                    print "c1=",condition1
-                    print "c2=",condition2
-                    print "c3=",condition3
-                    print "c4=",condition4
-                    print "c5=",condition5
-                    print "c6=",condition6
-                    Left_Limit_condition=Motor_value>=0.7
-                    if ((condition1 or condition2) and condition6 and Left_Limit_condition):
-                        break
-                    if ((condition3 or condition4) and condition5 and Left_Limit_condition):
-                        break
-                    
+        #while(Not_done):
+        self.ik_rightFinger()
+        print "d1=",self.d1
+        print "d2=",self.d2
+        solution=np.arccos(float(((self.d1 - 2*self.w0)**2 + self.w0**2 - (self.d2)**2 - self.wp**2)/(2*self.wp*(self.d2))))
+        print solution
+        '''
+        if (self.t2<0.8):
+        '''
+        Not_done=0
+        theta= read_pos()
+        Motor_value = theta[0] - 0.07
+            
+        rotate_object_clockwise(Motor_value)
+        while(1):
+            global Block_orientation
+            theta= read_pos()
+            Motor_value = theta[0] - 0.02
+            rotate_object_clockwise(Motor_value)
+            finger_angle = encoder_gripper_angle_conversion(theta[1],1)
+            print "Block_orientation=",Block_orientation
+            print "Finger_angle=",finger_angle
+            print "Diff",(abs(Block_orientation-finger_angle))%90
+            condition1=(abs(Block_orientation-finger_angle))%90<10
+            condition2=((abs(Block_orientation-finger_angle)))%90>80
+            condition3=(abs(Block_orientation+finger_angle))%90<10
+            condition4= (abs(Block_orientation+finger_angle))%90>80
+            condition5=Block_orientation<=180
+            condition6=Block_orientation>=180
+            Left_Limit_condition=Motor_value>=0.50
+            print "c1=",condition1
+            print "c2=",condition2
+            print "c3=",condition3
+            print "c4=",condition4
+            print "c5=",condition5
+            print "c6=",condition6
+            
+            if ((condition1 or condition2) and condition6 and Left_Limit_condition):
+                break
+            if ((condition3 or condition4) and condition5 and Left_Limit_condition):
+                break
+                                
+            '''
             else:
                 self.t2 = self.t2 - 0.02
                 slide_right_finger_down(angle_conversion(self.t2,1))
-
-
+            '''
     def visualCtrl(self,goal_x,goal_y, goal_theta):
         print "Visual Servoing started"
         # Time interval
-        Ki = 0.5
-        Kp = 3
-        dt = 0.1
+        Ki = 0
+        Kp = 1
+        dt = 0.03
         # Visual Control
         #theta = 0.814407
         #rospy.init_node('Vs')
@@ -353,7 +424,97 @@ class Finger:
         for i in range(MAX_ITERATIONS):
             self.listener()
             time.sleep(2)
-            # Right Finger Slide
+             # Left Finger Slide
+                # for i in range(2):
+
+                #     theta = theta - 0.1
+                #     slide_right_finger_up(theta)
+                #     print theta
+                #     time.sleep(2)
+                    
+                    
+                    # theta = theta + 0.1
+                    # slide_left_finger_down(angle_conversion(theta, 0))
+            #for i in range(JACOBIAN_STEPS):
+            dtheta = [[1]]
+            n = 0
+            E = np.array([0., 0.])
+            #abs(dtheta[0][0]) >=0.01 and 
+            while n<JACOBIAN_STEPS:
+                #dtheta = [[1]]
+                #n=0
+                #abs(dtheta[0][0]) >=0.01 and 
+                #while n<JACOBIAN_STEPS:
+                
+                self.ik_leftFinger()
+                print 'theta2 = ', self.t2
+                #theta= read_pos()
+                #print theta
+                # self.t1=theta[0]
+                # self.t2=theta[1]
+                #self.t1=encoder_gripper_angle_conversion(theta[0],0)*np.pi/180
+                #self.t2=encoder_gripper_angle_conversion(theta[1],1)*np.pi/180
+                #print self.t1
+                
+                X = np.array([self.x, self.y])
+                e = X - self.X_d
+                E = E + e
+                if norm(e) < TOLERANCE:
+                    time.sleep(1)
+                    print 'x, y = ', self.x, self.y
+                    print 'reached'
+                    return
+                J = np.matrix([[-(self.d2 + self.w0 / 2.0) * sin(self.t2) - (self.w0 / 2 + self.fw) * cos(self.t2)], [(self.d2 + self.w0 / 2) * cos(self.t2) - (self.w0 / 2 + self.fw) * sin(self.t2)]], dtype='float')
+                dtheta = -np.linalg.pinv(J) *  (Kp*e.reshape(e.shape[0], 1) + Ki*E.reshape(E.shape[0], 1)) * dt
+                self.t2 = self.t2 + dtheta[0, 0]
+                #config = 2
+                self.translateLeft()
+                print 'theta1 = ', self.t1
+                print 'theta2 = ', self.t2
+                print 'd1 = ', self.d1
+                print 'd2 = ', self.d2
+                print 'dtheta =', dtheta
+                if dtheta[0, 0] > 0:
+                    # print 'x position = ', self.x, 'y position = ', self.y
+                    # print 't1 =', self.t1, 't2 = ', self.t2
+                    # print 'left slide down'
+                    print "SLide Left Down "
+                    self.action = 6
+                    self.pub.publish(self.action)
+                    #slide_left_finger_down(theta[0]-0.04)
+                    slide_left_finger_down(angle_conversion(self.t1,0))
+                    X = np.array([self.x, self.y])
+                    e = X - self.X_d
+                    E = E + e
+                    if norm(e) < TOLERANCE:
+                        time.sleep(1)
+                        print 'x, y = ', self.x, self.y
+                        print 'reached'
+                        return
+
+                else:
+                    # print 'x position = ', self.x, 'y position = ', self.y
+                    # print 't1 =', self.t1, 't2 = ', self.t2
+                    # print 'left slide up'
+                    print "SLide Left Up "
+                    self.action = 8
+                    self.pub.publish(self.action)
+                    #slide_left_finger_up(theta[1]-0.04)
+                    slide_left_finger_up(angle_conversion(self.t2,1))
+                    X = np.array([self.x, self.y])
+                    e = X - self.X_d
+                    E = E + e
+                    if norm(e) < TOLERANCE:
+                        time.sleep(1)
+                        print 'x, y = ', self.x, self.y
+                        print 'reached'
+                        return
+
+                #time.sleep(1)
+                print 'x, y = ', self.x, self.y
+                n = n + 1
+        
+        # Right Finger Slide
             #for i in range(JACOBIAN_STEPS):
             dtheta = [[1]]
             n=0
@@ -380,7 +541,7 @@ class Finger:
                 J = np.matrix([[-(self.d1 + self.w0 / 2.0) * sin(self.t1) + (self.w0 / 2 + self.fw) * cos(self.t1)], [(self.d1 + self.w0 / 2.0) * cos(self.t1) + (self.w0 / 2 + self.fw) * sin(self.t1)]], dtype='float')
                 dtheta = -np.linalg.pinv(J) * (Kp*e.reshape(e.shape[0], 1) + Ki*E.reshape(E.shape[0], 1))* dt
                 self.t1 = self.t1 + dtheta[0, 0]
-                config = 1
+                #config = 1
                 self.translateRight()
                 print 'dtheta =', dtheta
                 
@@ -389,88 +550,42 @@ class Finger:
                     # print 't1 =', self.t1, 't2 = ', self.t2
                     # print 'right slide down'
                     print "SLide Right Down "
+                    self.action = 7
+                    self.pub.publish(self.action)
                     # slide_right_finger_down(theta[1]-0.04)
                     slide_right_finger_down(angle_conversion(self.t2,1))
+                    X = np.array([self.x, self.y])
+                    X = np.array([self.x, self.y])
+                    e = X - self.X_d
+                    E = E + e
+                    if norm(e) < TOLERANCE:
+                        time.sleep(1)
+                        print 'x, y = ', self.x, self.y
+                        print 'reached'
+                        return
 
                 else:
                     # print 'x position = ', self.x, 'y position = ', self.y
                     # print 't1 =', self.t1, 't2 = ', self.t2
                     # print 'right slide up'\
                     print "SLide Right Up "
-                    # slide_right_finger_up(theta[0]-0.04)
+                    self.action = 9
+                    self.pub.publish(self.action)
+                    #slide_right_finger_up(theta[0]-0.04)
                     slide_right_finger_up(angle_conversion(self.t1,0))
+                    X = np.array([self.x, self.y])
+                    e = X - self.X_d
+                    E = E + e
+                    if norm(e) < TOLERANCE:
+                        time.sleep(1)
+                        print 'x, y = ', self.x, self.y
+                        print 'reached'
+                        return
                 n = n+1
                 # Send to the robot??
                 #time.sleep(1)
                 print 'x, y = ', self.x, self.y
-            # Left Finger Slide
-            #for i in range(JACOBIAN_STEPS):
-            dtheta = [[1]]
-            n = 0
-            E = np.array([0., 0.])
-            #abs(dtheta[0][0]) >=0.01 and 
-            while n<JACOBIAN_STEPS:
-                #dtheta = [[1]]
-                #n=0
-                #abs(dtheta[0][0]) >=0.01 and 
-                #while n<JACOBIAN_STEPS:
-                
-                self.ik_leftFinger()
-                print 'theta2 = ', self.t2
-                #theta= read_pos()
-                #print theta
-                # self.t1=theta[0]
-                # self.t2=theta[1]
-                #self.t1=encoder_gripper_angle_conversion(theta[0],0)*np.pi/180
-                #self.t2=encoder_gripper_angle_conversion(theta[1],1)*np.pi/180
-                #print self.t1
-                X = np.array([self.x, self.y])
-                e = X - self.X_d
-                E = E + e
-                if norm(e) < TOLERANCE:
-                    time.sleep(1)
-                    print 'x, y = ', self.x, self.y
-                    print 'reached'
-                    return
-                J = np.matrix([[-(self.d2 + self.w0 / 2.0) * sin(self.t2) - (self.w0 / 2 + self.fw) * cos(self.t2)], [(self.d2 + self.w0 / 2) * cos(self.t2) - (self.w0 / 2 + self.fw) * sin(self.t2)]], dtype='float')
-                dtheta = -np.linalg.pinv(J) *  (Kp*e.reshape(e.shape[0], 1) + Ki*E.reshape(E.shape[0], 1)) * dt
-                self.t2 = self.t2 + dtheta[0, 0]
-                config = 2
-                self.translateLeft()
-                print 'theta1 = ', self.t1
-                print 'theta2 = ', self.t2
-                print 'd1 = ', self.d1
-                print 'd2 = ', self.d2
-                print 'dtheta =', dtheta
-                if dtheta[0, 0] > 0:
-                    # print 'x position = ', self.x, 'y position = ', self.y
-                    # print 't1 =', self.t1, 't2 = ', self.t2
-                    # print 'left slide down'
-                    print "SLide Left Down "
-                    # slide_left_finger_down(theta[0]-0.04)
-                    slide_left_finger_down(angle_conversion(self.t1,0))
-
-                else:
-                    # print 'x position = ', self.x, 'y position = ', self.y
-                    # print 't1 =', self.t1, 't2 = ', self.t2
-                    # print 'left slide up'
-                    print "SLide Left Up "
-                    # slide_left_finger_up(theta[1]-0.04)
-                    slide_left_finger_up(angle_conversion(self.t2,1))
-
-                #time.sleep(1)
-                print 'x, y = ', self.x, self.y
-                n = n + 1
-                # for i in range(2):
-
-                #     theta = theta - 0.1
-                #     slide_right_finger_up(theta)
-                #     print theta
-                #     time.sleep(2)
-                    
-                    
-                    # theta = theta + 0.1
-                    # slide_left_finger_down(angle_conversion(theta, 0))
+           
                     
 
 def Visual_Servoing(req):

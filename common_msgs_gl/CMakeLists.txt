@@ -9,6 +9,7 @@ add_message_files(
   FILES
   PointArray.msg
   PointArray3D.msg
+  Motor_position.msg
 )
 
 add_service_files(
